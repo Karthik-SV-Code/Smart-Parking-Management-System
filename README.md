@@ -61,4 +61,3 @@ A desktop-based Smart Parking Management System developed using **Java Swing**, 
 
 ---
 
-## 📂 Project Structure (Overview)
