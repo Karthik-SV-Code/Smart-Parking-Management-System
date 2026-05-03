@@ -1,0 +1,33 @@
+import javax.swing.*;
+import java.awt.*;
+
+public class VerifyPanel extends JPanel {
+    public VerifyPanel(String user, String role) {
+        setLayout(new BorderLayout(8,8));
+        setOpaque(false);
+        JLabel lbl = new JLabel("Verify Bookings");
+        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD,16f));
+        add(lbl, BorderLayout.NORTH);
+
+        RoundButton refresh = new RoundButton("Refresh");
+        refresh.addActionListener(e -> load());
+        JPanel top = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        top.setOpaque(false);
+        top.add(refresh);
+        add(top, BorderLayout.SOUTH);
+
+        load();
+    }
+
+    private void load() {
+        java.util.List<Booking> list = XMLUtils.readAllBookings("bookings.xml");
+        StringBuilder sb = new StringBuilder();
+        for(Booking b: list) sb.append(b.toString()).append("\n");
+        if(sb.length()==0) sb.append("No bookings.");
+        JTextArea ta = new JTextArea(sb.toString(), 20, 80);
+        ta.setEditable(false);
+        removeAll();
+        add(new JScrollPane(ta), BorderLayout.CENTER);
+        revalidate(); repaint();
+    }
+}

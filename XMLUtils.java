@@ -1,0 +1,350 @@
+import org.w3c.dom.*;
+import javax.xml.parsers.*;
+import javax.xml.transform.*;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
+import javax.swing.JOptionPane;
+import java.io.*;
+import java.util.*;
+
+public class XMLUtils {
+    // Ensure file exists, and create default admin/security users and 6 default slots if needed
+    public static void ensureFileExists(String filename, String rootName) {
+        File f = new File(filename);
+        if(!f.exists()) {
+            try {
+                DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+                Document doc = db.newDocument();
+                Element root = doc.createElement(rootName);
+                doc.appendChild(root);
+                if(rootName.equals("users")) {
+                    addDefaultAccount(doc, root, "Admin", "admin", "admin123", "admin");
+                    addDefaultAccount(doc, root, "Security", "security", "security123", "security");
+                } else if(rootName.equals("slots")) {
+                    // create 6 default free slots S1..S6
+                    for(int i=1;i<=6;i++) {
+                        Element se = doc.createElement("slot");
+                        se.setAttribute("id", "S"+i);
+                        se.setAttribute("status", "free");
+                        se.setAttribute("type", i<=3 ? "Compact" : "Large");
+                        se.setAttribute("location", "A"+i);
+                        root.appendChild(se);
+                    }
+                }
+                saveDocument(doc, filename);
+                if(rootName.equals("users")) {
+                    System.out.println("Created " + filename + " with default admin/security accounts.");
+                    JOptionPane.showMessageDialog(null, "Default admin and security accounts created.\nAdmin: admin/admin123\nSecurity: security/security123", "Info", JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    System.out.println("Created " + filename + " with default slots.");
+                }
+            } catch (Exception e) { e.printStackTrace(); }
+        }
+    }
+
+    private static void addDefaultAccount(Document doc, Element root, String name, String username, String password, String role) {
+        Element u = doc.createElement("user");
+        Element n = doc.createElement("name"); n.setTextContent(name);
+        Element un = doc.createElement("username"); un.setTextContent(username);
+        Element p = doc.createElement("password"); p.setTextContent(password);
+        Element r = doc.createElement("role"); r.setTextContent(role);
+        u.appendChild(n); u.appendChild(un); u.appendChild(p); u.appendChild(r);
+        root.appendChild(u);
+    }
+
+    // Append a user with vehicle details
+    public static void appendUserWithVehicle(String name, String username, String password, String role, String vehiclePlate, String vehicleModel, String filename) {
+        try {
+            ensureFileExists(filename,"users");
+            File f = new File(filename);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            Element root = doc.getDocumentElement();
+            Element u = doc.createElement("user");
+            Element n = doc.createElement("name"); n.setTextContent(name);
+            Element un = doc.createElement("username"); un.setTextContent(username);
+            Element p = doc.createElement("password"); p.setTextContent(password);
+            Element r = doc.createElement("role"); r.setTextContent(role);
+            Element v = doc.createElement("vehicle");
+            Element vp = doc.createElement("plate"); vp.setTextContent(vehiclePlate);
+            Element vm = doc.createElement("model"); vm.setTextContent(vehicleModel);
+            v.appendChild(vp); v.appendChild(vm);
+            u.appendChild(n); u.appendChild(un); u.appendChild(p); u.appendChild(r); u.appendChild(v);
+            root.appendChild(u);
+            saveDocument(doc, filename);
+        } catch (Exception e) { e.printStackTrace(); }
+    }
+
+    public static boolean userExists(String username, String filename) {
+        return readAllUsers(filename).stream().anyMatch(u -> u.getUsername().equalsIgnoreCase(username));
+    }
+
+    public static List<User> readAllUsers(String filename) {
+        List<User> list = new ArrayList<>();
+        try {
+            File f = new File(filename);
+            if(!f.exists()) return list;
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("user");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                String name = getTag(e,"name");
+                String username = getTag(e,"username");
+                String password = getTag(e,"password");
+                String role = getTag(e,"role");
+                String plate = "";
+                String model = "";
+                NodeList vs = e.getElementsByTagName("vehicle");
+                if(vs.getLength()>0) {
+                    Element ve = (Element)vs.item(0);
+                    plate = getTag(ve,"plate");
+                    model = getTag(ve,"model");
+                }
+                list.add(new User(name, username, password, role, plate, model));
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return list;
+    }
+
+    public static boolean authenticateUser(String username, String password, String filename) {
+        return readAllUsers(filename).stream().anyMatch(u -> u.getUsername().equals(username) && u.getPassword().equals(password));
+    }
+
+    public static String getUserRole(String username, String filename) {
+        for(User u : readAllUsers(filename))
+            if(u.getUsername().equals(username)) return u.getRole();
+        return "user";
+    }
+
+    public static String getUserVehiclePlate(String username, String filename) {
+        for(User u: readAllUsers(filename)) if(u.getUsername().equals(username)) return u.getVehiclePlate();
+        return "";
+    }
+
+    // Slots
+    public static void addSlot(Slot s, String filename) {
+        try {
+            ensureFileExists(filename,"slots");
+            File f = new File(filename);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            Element root = doc.getDocumentElement();
+            Element se = doc.createElement("slot");
+            se.setAttribute("id", s.getId());
+            se.setAttribute("status", s.getStatus());
+            se.setAttribute("type", s.getType());
+            se.setAttribute("location", s.getLocation());
+            root.appendChild(se);
+            saveDocument(doc, filename);
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+    public static List<Slot> readAllSlots(String filename) {
+        List<Slot> list = new ArrayList<>();
+        try {
+            File f = new File(filename);
+            if(!f.exists()) return list;
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("slot");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                Slot s = new Slot(e.getAttribute("id"), e.getAttribute("status"), e.getAttribute("type"), e.getAttribute("location"));
+                if(e.hasAttribute("bookedBy")) s.setBookedBy(e.getAttribute("bookedBy"));
+                list.add(s);
+            }
+        } catch(Exception e){ e.printStackTrace(); }
+        return list;
+    }
+
+    public static void markSlotBooked(String slotId, String username, String filename) {
+        try {
+            File f = new File(filename);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("slot");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                if(e.getAttribute("id").equals(slotId)) {
+                    e.setAttribute("status","booked");
+                    e.setAttribute("bookedBy", username);
+                    break;
+                }
+            }
+            saveDocument(doc, filename);
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+    public static boolean deleteSlot(String slotId, String slotsFile, String bookingsFile) {
+        try {
+            // don't delete if there is a booking for this slot
+            List<Booking> bookings = readAllBookings(bookingsFile);
+            for(Booking b: bookings) if(b.getSlotId().equals(slotId)) return false;
+            File f = new File(slotsFile);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("slot");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                if(e.getAttribute("id").equals(slotId)) {
+                    e.getParentNode().removeChild(e);
+                    break;
+                }
+            }
+            saveDocument(doc, slotsFile);
+            return true;
+        } catch(Exception e){ e.printStackTrace(); return false; }
+    }
+
+    // Bookings
+    public static void addBooking(Booking b, String filename) {
+        try {
+            ensureFileExists(filename,"bookings");
+            File f = new File(filename);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            Element root = doc.getDocumentElement();
+            Element be = doc.createElement("booking");
+            be.setAttribute("id", b.getId());
+            be.setAttribute("user", b.getUser());
+            be.setAttribute("slot", b.getSlotId());
+            be.setAttribute("vehicle", b.getVehicle());
+            be.setAttribute("status", b.getStatus());
+            root.appendChild(be);
+            saveDocument(doc, filename);
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+    public static List<Booking> readAllBookings(String filename) {
+        List<Booking> list = new ArrayList<>();
+        try {
+            File f = new File(filename);
+            if(!f.exists()) return list;
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("booking");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                Booking b = new Booking(e.getAttribute("id"), e.getAttribute("user"), e.getAttribute("slot"), e.getAttribute("vehicle"), e.getAttribute("status"));
+                list.add(b);
+            }
+        } catch(Exception e){ e.printStackTrace(); }
+        return list;
+    }
+
+    public static List<Booking> readBookingsForUser(String username, String filename) {
+        List<Booking> all = readAllBookings(filename);
+        List<Booking> out = new ArrayList<>();
+        for(Booking b: all) if(b.getUser().equals(username)) out.add(b);
+        return out;
+    }
+
+    public static void markBookingVerified(String bookingId, String filename) {
+        try {
+            File f = new File(filename);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("booking");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                if(e.getAttribute("id").equals(bookingId)) {
+                    e.setAttribute("status","approved");
+                    break;
+                }
+            }
+            saveDocument(doc, filename);
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+    public static void cancelBooking(String bookingId, String bookingsFile, String slotsFile) {
+        try {
+            File f = new File(bookingsFile);
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("booking");
+            String slotId = null;
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                if(e.getAttribute("id").equals(bookingId)) {
+                    slotId = e.getAttribute("slot");
+                    e.getParentNode().removeChild(e);
+                    break;
+                }
+            }
+            saveDocument(doc, bookingsFile);
+            if(slotId!=null) {
+                File sf = new File(slotsFile);
+                Document slDb = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(sf);
+                NodeList sn = slDb.getElementsByTagName("slot");
+                for(int i=0;i<sn.getLength();i++) {
+                    Element se = (Element)sn.item(i);
+                    if(se.getAttribute("id").equals(slotId)) {
+                        se.setAttribute("status","free");
+                        se.removeAttribute("bookedBy");
+                        break;
+                    }
+                }
+                saveDocument(slDb, slotsFile);
+            }
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+    // Config
+    public static void saveConfig(String configFile, String key, String value) {
+        try {
+            Properties p = new Properties();
+            File f = new File(configFile);
+            if(f.exists()) try(FileInputStream in = new FileInputStream(f)) { p.load(in); }
+            p.setProperty(key, value==null?"":value);
+            try(FileOutputStream out = new FileOutputStream(configFile)) { p.store(out, "app config"); }
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+    public static String loadConfig(String configFile, String key) {
+        try {
+            Properties p = new Properties();
+            File f = new File(configFile);
+            if(!f.exists()) return "";
+            try(FileInputStream in = new FileInputStream(f)) { p.load(in); }
+            return p.getProperty(key, "");
+        } catch(Exception e){ e.printStackTrace(); return ""; }
+    }
+
+    // helpers
+    private static String getTag(Element parent, String tag) {
+        NodeList nl = parent.getElementsByTagName(tag);
+        return nl.getLength()>0 ? nl.item(0).getTextContent() : "";
+    }
+
+    
+
+    // Update booking status (e.g., approved, pending)
+    public static void updateBookingStatus(String bookingId, String status, String bookingsFile) {
+        try {
+            File f = new File(bookingsFile);
+            if(!f.exists()) return;
+            DocumentBuilder db = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+            Document doc = db.parse(f);
+            NodeList nodes = doc.getElementsByTagName("booking");
+            for(int i=0;i<nodes.getLength();i++) {
+                Element e = (Element)nodes.item(i);
+                if(e.getAttribute("id").equals(bookingId)) {
+                    e.setAttribute("status", status);
+                    break;
+                }
+            }
+            saveDocument(doc, bookingsFile);
+        } catch(Exception e){ e.printStackTrace(); }
+    }
+
+private static void saveDocument(Document doc, String filename) throws Exception {
+        TransformerFactory tf = TransformerFactory.newInstance();
+        Transformer t = tf.newTransformer();
+        t.setOutputProperty(OutputKeys.INDENT, "yes");
+        t.setOutputProperty("{http://xml.apache.org/xslt}indent-amount", "2");
+        DOMSource src = new DOMSource(doc);
+        StreamResult sr = new StreamResult(new File(filename));
+        t.transform(src, sr);
+    }
+}
