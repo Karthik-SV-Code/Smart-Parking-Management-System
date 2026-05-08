@@ -2,7 +2,7 @@
 
 A desktop-based Smart Parking Management System developed using **Java Swing**, designed to efficiently manage parking slots, bookings, and user roles with a structured workflow.
 
----
+
 
 ## Features
 
@@ -29,7 +29,7 @@ A desktop-based Smart Parking Management System developed using **Java Swing**, 
   **Data Persistence**
   - Uses XML files for storing user data, parking slots, and bookings
 
----
+
 
 ##  Tech Stack
 
@@ -38,7 +38,7 @@ A desktop-based Smart Parking Management System developed using **Java Swing**, 
 - **Data Storage:** XML  
 - **Architecture:** Modular (UI panels, models, and utility classes)
 
----
+
 
 ##  System Modules
 
@@ -49,7 +49,7 @@ A desktop-based Smart Parking Management System developed using **Java Swing**, 
 - Verification System (Security/Admin)
 - Profile Management
 
----
+
 
 ##  How It Works
 
@@ -59,5 +59,5 @@ A desktop-based Smart Parking Management System developed using **Java Swing**, 
 4. Admin/Security verifies booking requests
 5. Slot availability updates dynamically in the interface
 
----
+
 
