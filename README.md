@@ -9,24 +9,24 @@ A desktop-based Smart Parking Management System developed using **Java Swing**, 
  **Role-Based Access Control**
   - Admin, User, and Security roles with separate functionalities
 
--  **Parking Slot Management**
+   **Parking Slot Management**
   - Add, remove, and monitor parking slots
   - View real-time availability status
 
--  **Automatic Slot Allocation**
+  **Automatic Slot Allocation**
   - Implements a **first-fit algorithm** to assign available parking slots efficiently
 
--  **Booking System**
+  **Booking System**
   - Users can request parking slots
   - Booking status tracking (e.g., pending/verified)
 
--  **Verification Module**
+  **Verification Module**
   - Security/Admin can verify and manage booking requests
 
--  **Dynamic User Interface**
+  **Dynamic User Interface**
   - Built using Java Swing with panel-based navigation (CardLayout)
 
--  **Data Persistence**
+  **Data Persistence**
   - Uses XML files for storing user data, parking slots, and bookings
 
 ---
